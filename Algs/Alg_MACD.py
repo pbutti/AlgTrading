@@ -87,7 +87,21 @@ def main():
     fig.add_trace(macd_histo,row=2,col=1,secondary_y=True)
     fig.update_yaxes(range=[-10,10],row=2,col=1)
     intersections,insights = getMACD_intersections(MACD_obj.macd_signal(), MACD_obj.macd())
+    print(intersections)
     print(insights)
+    actions = [data.index[t] for t in intersections]
+    print(actions)
+    for action in actions:
+        fig.add_shape(type='line',
+                      yref='y',
+                      xref='x',
+                      x0=action,
+                      y0=-10,
+                      x1=action,
+                      y1=10,
+                      line=dict(color='green',width=2,dash='dot'),
+                      row=2,
+                      col=1)
 
     fig.show()
 
