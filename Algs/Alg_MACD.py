@@ -1,11 +1,29 @@
 import yfinance
 import pandas as pd
 import ta
-from matplotlib import pyplot as plt
-from datetime import datetime
-import mplfinance as fplt
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
+
+
+# This returns the intersections between fast and signal MACD  (lst_1 =
+# From https://towardsdatascience.com/algorithmic-trading-with-macd-and-python-fef3d013e9f3
+def getMACD_intersections(lst_1 : pd.Series, lst_2 : pd.Series) :
+    #TODO: check this algorithm!
+    intersections = []
+    insights = []
+    if len(lst_1) > len(lst_2):
+        settle = len(lst_2)
+    else:
+        settle = len(lst_1)
+    for i in range(settle - 1):
+        if (lst_1[i + 1] < lst_2[i + 1]) != (lst_1[i] < lst_2[i]):
+            if ((lst_1[i + 1] < lst_2[i + 1]), (lst_1[i] < lst_2[i])) == (True, False):
+                insights.append('buy')
+            else:
+                insights.append('sell')
+            intersections.append(i)
+    return intersections, insights
 
 # This returns the candlestic and the volume bar.
 def makeCSPlot(df) -> [go.Candlestick,go.Bar]:
@@ -39,22 +57,39 @@ def main():
 
     MACD_obj = ta.trend.MACD(data['Close'])
 
-    # Create the macd trace for plotting
-    macd_scatter = go.Scatter(x=data.index,y=MACD_obj.macd())
+    #
+    # Create the macd trace for plotting and the macd histogram
+    macd_fast = go.Scatter(x=data.index,y=MACD_obj.macd())
+    macd_histo   = go.Bar(x=data.index,y=MACD_obj.macd_diff())
+    macd_signal  = go.Scatter(x=data.index,y=MACD_obj.macd_signal())
 
     # Create figure with secondary y-axis
-    fig = make_subplots(rows=2,cols=1,specs=[[{"secondary_y": True}],[{"secondary_y" : False}]])
+    fig = make_subplots(rows=2,cols=1,specs=[[{"secondary_y": True}],[{"secondary_y" : True}]])
 
     # Add the candle stick and the volumes to the figure
-    fig.add_trace(candlestick,row=1,col=1, secondary_y=True)
-    fig.add_trace(volumes,row=1,col=1, secondary_y=False)
+    fig.add_trace(candlestick,row=1,col=1, secondary_y=False)
+    fig.add_trace(volumes,row=1,col=1, secondary_y=True)
     fig.layout.yaxis2.showgrid = False
 
+    # Add the MACD and the MACD histogram
+    fig.add_trace(macd_fast,row=2,col=1,secondary_y=True)
+    fig.add_trace(macd_signal,row=2,col=1,secondary_y=True)
+    fig.add_shape(type='line',
+                  yref="y",
+                  xref="x",
+                  x0=data.index[0],  #x-axis min
+                  y0=0,
+                  x1=data.index[-1], #x-axis max
+                  y1=0,
+                  line=dict(color='black', width=2,dash="dash"),
+                  row=2,
+                  col=1)
+    fig.add_trace(macd_histo,row=2,col=1,secondary_y=True)
+    fig.update_yaxes(range=[-10,10],row=2,col=1)
+    intersections,insights = getMACD_intersections(MACD_obj.macd_signal(), MACD_obj.macd())
+    print(insights)
 
-    fig.add_trace(macd_scatter,row=2,col=1)
     fig.show()
-
-    #plotly_fig.show()
 
 if __name__ == "__main__":
     main()
