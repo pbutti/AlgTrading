@@ -1,24 +1,27 @@
+from typing import List, Any, Union
+
 import yfinance
 import pandas as pd
 import ta
 import plotly.graph_objects as go
-import plotly.express as px
+from pandas import DataFrame, Series
+from plotly.graph_objs import Scatter
 from plotly.subplots import make_subplots
+from datetime import date
 
 
-# This returns the intersections between fast and signal MACD  (lst_1 =
+# This returns the intersections between fast and signal MACD
 # From https://towardsdatascience.com/algorithmic-trading-with-macd-and-python-fef3d013e9f3
-def getMACD_intersections(lst_1 : pd.Series, lst_2 : pd.Series) :
-    #TODO: check this algorithm!
+def getMACD_intersections(signal : pd.Series, fast : pd.Series) :
     intersections = []
-    insights = []
-    if len(lst_1) > len(lst_2):
-        settle = len(lst_2)
+    insights: list[str] = []
+    if len(signal) > len(fast):
+        settle = len(fast)
     else:
-        settle = len(lst_1)
+        settle = len(signal)
     for i in range(settle - 1):
-        if (lst_1[i + 1] < lst_2[i + 1]) != (lst_1[i] < lst_2[i]):
-            if ((lst_1[i + 1] < lst_2[i + 1]), (lst_1[i] < lst_2[i])) == (True, False):
+        if (signal[i + 1] < fast[i + 1]) != (signal[i] < fast[i]):
+            if ((signal[i + 1] < fast[i + 1]), (signal[i] < fast[i])) == (True, False):
                 insights.append('buy')
             else:
                 insights.append('sell')
@@ -39,71 +42,165 @@ def makeCSPlot(df) -> [go.Candlestick,go.Bar]:
 
     return [candlestick,volumes]
 
-def main():
-    print("MACD Alg")
-    #Get some data
-    data = yfinance.download('AAPL', '2019-11-19', '2020-11-20')
+# This returns a "green" or "red" color depending if the insight is "buy" or "sell"
+# In the case the insight in not buy/sell, return blue
+def LineColorFromInsight(insight):
+    if insight == "buy":
+        return "green"
+    elif insight == "sell":
+        return "red"
+    else:
+        return "blue"
+
+# This function test the trades gain/loss based on the MACD algorithm
+# df: Time series data
+# intersections = The MACD_fast vs MACD_signal intersections
+# insights =  The list containing the actions
+# pat = Patience parameter: how long after the intersection was made, the trade is made.
+# nsec = How many securities are traded
+
+def TestTrades(df,intersections,insights,pat=1,nsec=1) :
+    if len(intersections)<1:
+        return 0
+    profit=0
+    #TODO check this algorithm! I'm not convinced this is the right metric
+    for i in range(len(intersections) - pat):
+        index = intersections[i]
+        print(index)
+        true_trade = None
+        if df['Close'][index] <= df['Close'][index + pat]:
+            print("Data Close at index",index,df['Close'][index],df.index[index])
+            print("Data Close at index",index+pat,df['Close'][index+pat],df.index[index+pat])
+            true_trade = 'buy'
+        else:
+            true_trade = 'sell'
+    if true_trade != None:
+        if insights[i] == true_trade:
+            print(index,index+pat)
+            profit += nsec*abs(df['Close'][index] - df['Close'][index + pat])
+            print(df['Close'][index])
+            print(df['Close'][index+pat])
+        else:
+            profit += -nsec*abs(df['Close'][index] - df['Close'][index + pat])
+            print(df['Close'][index])
+            print(df['Close'][index+pat])
+
+    return profit
+
+def testtrades_2(df,intersections, insights,pat=0,nsec=1,tax=0.2):
+    #TODO Crosscheck this computation
+    if len(intersections) < 1:
+        return 0
+    profit = 0
+    buy_amount = 0
+    sell_amount = 0
+
+    for i in range(len(intersections) - pat):
+        index=intersections[i]+pat
+        action_close_price = df['Close'][index]
+        if insights[i] == "buy":
+            buy_amount+=action_close_price
+        else:
+            sell_amount+=action_close_price
+
+    profit = nsec*(sell_amount - buy_amount) * (1-tax)
+
+    return profit
+
+def makefullplot(df,MACD_obj, intersections=[],insights=[]):
 
     # Form the candlestick and volume plots
-    candlestick,volumes = makeCSPlot(data)
+    candlestick, volumes = makeCSPlot(df)
 
-    print(data.columns)
-    # Clean nan values
-    df = ta.utils.dropna(data)
-
-    print(type(data['Close']))
-    #Compute the MACD
-    # macd = ta.add_trend_ta(data,'High','Low','Close',True) #The ADX indicator is broken?
-
-    MACD_obj = ta.trend.MACD(data['Close'])
-
-    #
     # Create the macd trace for plotting and the macd histogram
-    macd_fast = go.Scatter(x=data.index,y=MACD_obj.macd())
-    macd_histo   = go.Bar(x=data.index,y=MACD_obj.macd_diff())
-    macd_signal  = go.Scatter(x=data.index,y=MACD_obj.macd_signal())
+    macd_fast: Scatter = go.Scatter(x=df.index, y=MACD_obj.macd())
+    macd_histo = go.Bar(x=df.index, y=MACD_obj.macd_diff())
+    macd_signal = go.Scatter(x=df.index, y=MACD_obj.macd_signal())
 
     # Create figure with secondary y-axis
-    fig = make_subplots(rows=2,cols=1,specs=[[{"secondary_y": True}],[{"secondary_y" : True}]])
+    fig = make_subplots(rows=2, cols=1, specs=[[{"secondary_y": True}], [{"secondary_y": True}]])
 
     # Add the candle stick and the volumes to the figure
-    fig.add_trace(candlestick,row=1,col=1, secondary_y=False)
-    fig.add_trace(volumes,row=1,col=1, secondary_y=True)
+    fig.add_trace(candlestick, row=1, col=1, secondary_y=False)
+    fig.add_trace(volumes, row=1, col=1, secondary_y=True)
     fig.layout.yaxis2.showgrid = False
+    fig.update_layout(xaxis_rangeslider_visible=False)
 
     # Add the MACD and the MACD histogram
-    fig.add_trace(macd_fast,row=2,col=1,secondary_y=True)
-    fig.add_trace(macd_signal,row=2,col=1,secondary_y=True)
+    fig.add_trace(macd_fast, row=2, col=1, secondary_y=True)
+    fig.add_trace(macd_signal, row=2, col=1, secondary_y=True)
     fig.add_shape(type='line',
                   yref="y",
                   xref="x",
-                  x0=data.index[0],  #x-axis min
+                  x0=df.index[0],  # x-axis min
                   y0=0,
-                  x1=data.index[-1], #x-axis max
+                  x1=df.index[-1],  # x-axis max
                   y1=0,
-                  line=dict(color='black', width=2,dash="dash"),
+                  line=dict(color='black', width=2, dash="dash"),
                   row=2,
                   col=1)
-    fig.add_trace(macd_histo,row=2,col=1,secondary_y=True)
-    fig.update_yaxes(range=[-10,10],row=2,col=1)
-    intersections,insights = getMACD_intersections(MACD_obj.macd_signal(), MACD_obj.macd())
-    print(intersections)
-    print(insights)
-    actions = [data.index[t] for t in intersections]
-    print(actions)
-    for action in actions:
+    fig.add_trace(macd_histo, row=2, col=1, secondary_y=True)
+    ymax = MACD_obj.macd().max()
+    ymin = MACD_obj.macd().min()
+    fig.update_yaxes(range=[ymin * 1.2, ymax * 1.2], row=2, col=1)
+
+    actions = [df.index[t] for t in intersections]
+
+    for iaction in range(len(actions)):
         fig.add_shape(type='line',
                       yref='y',
                       xref='x',
-                      x0=action,
-                      y0=-10,
-                      x1=action,
-                      y1=10,
-                      line=dict(color='green',width=2,dash='dot'),
+                      x0=actions[iaction],
+                      y0=ymin,
+                      x1=actions[iaction],
+                      y1=ymax,
+                      line=dict(color=LineColorFromInsight(insights[iaction]), width=2, dash='dot'),
                       row=2,
                       col=1)
 
     fig.show()
+    return fig
+
+
+
+def main():
+    print("MACD Alg")
+    #Config:
+    ticker="AAPL"
+    StartDate = '2020-08-23'
+    #Get some data
+    today = date.today().strftime("%Y-%m-%d")
+    #data: Union[Union[DataFrame, Series], Any] = yfinance.download(ticker, StartDate, today,interval='1h')
+    data: Union[Union[DataFrame, Series], Any] = yfinance.download(ticker, period='3mo', interval='1d')
+    print(data.head)
+    print(data.columns)
+
+    # Clean nan values
+    data = ta.utils.dropna(data)
+
+    print(type(data['Close']))
+    #Compute the MACD
+    #trends = ta.add_trend_ta(data,'High','Low','Close',True) #The ADX indicator is broken?
+
+    #For longer trading slow = 26, fast = 12, signal = 9
+    #For weekly trading skiw = 35, fast = 5 , signal = 5
+    #MACD_obj = ta.trend.MACD(data['Close'],n_slow=35,n_fast=5,n_sign=5)
+    #MACD_obj = ta.trend.MACD(data['Close'], n_slow=26, n_fast=12, n_sign=9)
+    MACD_obj = ta.trend.MACD(data['Close'])
+    print(MACD_obj)
+
+
+    intersections,insights = getMACD_intersections(MACD_obj.macd_signal(), MACD_obj.macd())
+    print(intersections)
+    print(insights)
+
+
+    profit = TestTrades(data,intersections,insights,1,1)
+    print("profit=",profit)
+    profit_2 = testtrades_2(data,intersections,insights,0,1,tax=0.)
+    print("profit_2",profit_2)
+
+    #makefullplot(data,MACD_obj,intersections,insights)
 
 if __name__ == "__main__":
     main()
