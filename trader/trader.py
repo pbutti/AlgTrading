@@ -33,6 +33,7 @@ def main():
           className="box", 
           children=[
             html.Div(id='current-info'),
+            dcc.Interval(id='interval-component', interval=5000, n_intervals=0),
             html.Div(
               [
                 "Security: ",
@@ -58,9 +59,10 @@ def main():
 
 @app.callback(
   Output(component_id='current-info', component_property='children'),
-  Input(component_id='symbol-input', component_property='value')
+  Input(component_id='symbol-input', component_property='value'),
+  Input(component_id='interval-component', component_property='n_intervals')
 )
-def get_security_info(symbol):
+def get_security_info(symbol, n):
   latest_price = r.stocks.get_latest_price(symbol)
   historical = r.stocks.get_stock_historicals(symbol, interval='day')
   price_diff = float(latest_price[0]) - float(historical[-1]['close_price'])
