@@ -200,7 +200,7 @@ def main():
     profit_2 = testtrades_2(data,intersections,insights,0,1,tax=0.)
     print("profit_2",profit_2)
 
-    #makefullplot(data,MACD_obj,intersections,insights)
+    makefullplot(data,MACD_obj,intersections,insights)
 
 if __name__ == "__main__":
     main()
