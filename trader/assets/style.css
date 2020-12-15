@@ -1,0 +1,15 @@
+
+body {
+
+  font: 300 21px Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: white;
+  background-color: #100a20;
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);  
+}
+
+.box {
+  display: flex; 
+  height: 50 px; 
+  justify-content: space-between;
+  align-items: center;
+}
