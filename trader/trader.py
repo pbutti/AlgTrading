@@ -68,13 +68,9 @@ def get_security_info(symbol, n):
     historical   = r.stocks.get_stock_historicals(symbol, interval='day')
 
   else:
-    print("FOR BTC!!")
     crypto_price = r.crypto.get_crypto_quote(symbol)
     latest_price = [crypto_price["mark_price"]]
-    print(latest_price)
-    print("Getting historicals")
     historical   = r.crypto.get_crypto_historicals(symbol)
-    print("DONE BTC historicals")
 
   price_diff = float(latest_price[0]) - float(historical[-1]['close_price'])
   price_diff_str = ''
@@ -100,33 +96,6 @@ def display_candlestick(symbol,
 
   span = 'day'
   interval = '5minute'
-  if '1d-button' in changed_id: 
-    span ='day'
-    interval = '5minute'
-  elif '1w-button' in changed_id: 
-    span ='week'
-    interval = '10minute'
-  elif '1m-button' in changed_id: 
-    span ='month'
-    span ='month'
-    interval = 'hour'
-  elif '3m-button' in changed_id: 
-    span ='3month'
-    interval = 'day'
-  elif '1y-button' in changed_id: 
-    span ='year'
-    interval = 'day'
-  elif '5y-button' in changed_id: 
-    span ='5year'
-    interval = 'day'
-
-  historicals_frame = ru.get_historicals(symbol, interval=interval, span=span)
-  #historicals_frame_day = ru.get_historicals(symbol, interval='5minute', span='day')
-  #historicals_frame = historicals_frame.append(historicals_frame_day.tail(1), ignore_index=True)
-  macd_obj = ta.trend.MACD  changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
-
-  span = 'day'
-  interval = '5minute'
   if '1d-button' in changed_id:
     span ='day'
     interval = '5minute'
@@ -134,7 +103,6 @@ def display_candlestick(symbol,
     span ='week'
     interval = '10minute'
   elif '1m-button' in changed_id:
-    span ='month'
     span ='month'
     interval = 'hour'
   elif '3m-button' in changed_id:
@@ -148,8 +116,8 @@ def display_candlestick(symbol,
     interval = 'day'
 
   historicals_frame = ru.get_historicals(symbol, interval=interval, span=span)
-  # = ru.get_historicals(symbol, interval='5minute', span='day')historicals_frame_day
-  #historicals_frame = historicals_frame.append(historicals_frame_day.tail(1), ignore_index=True)
+  historicals_frame_day = ru.get_historicals(symbol, interval='5minute', span='day')
+  historicals_frame = historicals_frame.append(historicals_frame_day.tail(1), ignore_index=True)
   macd_obj = ta.trend.MACD(historicals_frame['close_price'])
 
   fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.01)
@@ -206,65 +174,6 @@ def display_candlestick(symbol,
   )
   fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#1e1733')
 
-
-  return fig
-(historicals_frame['close_price'])
-
-  fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.01)
-
-  fig.add_trace( go.Candlestick(
-      x=historicals_frame['begins_at'],
-      open=historicals_frame['open_price'],
-      high=historicals_frame['high_price'],
-      low=historicals_frame['low_price'],
-      close=historicals_frame['close_price'], 
-      decreasing_line_color='#ff5a87', 
-      decreasing_line_width=.5, 
-      decreasing_fillcolor='#ff5a87',
-      increasing_line_color='#c3f53c',
-      increasing_line_width=.5,
-      increasing_fillcolor='#c3f53c',
-    ), row=1, col=1
-  )
-
-  fig.add_trace( go.Scatter(x=historicals_frame['begins_at'], 
-                            y=macd_obj.macd()), row=2, col=1
-               )
-  fig.add_trace( go.Scatter(x=historicals_frame['begins_at'], 
-                            y=macd_obj.macd_signal()), row=2, col=1
-               )
-
-  fig.add_trace( go.Bar(x=historicals_frame['begins_at'], 
-                        y=macd_obj.macd_diff()), row=2, col=1
-                )
-  
-  intersections, insights = ru.get_macd_intersections(macd_obj.macd_signal(),
-                                                      macd_obj.macd())
-
-  color = lambda n: '#c3f53c' if n == "buy" else '#ff5a87'
-  for intersection, insight in zip(intersections, insights): 
-    fig.add_vline(
-          x=historicals_frame['begins_at'][intersection], 
-          line_width=1, 
-          line_dash='dash', 
-          line_color=color(insight))
-
-  fig.update_layout(xaxis_rangeslider_visible=False,
-      margin=dict(l=20, r=20, t=0, b=20),
-      height=750, 
-      plot_bgcolor='#100a20', 
-      paper_bgcolor='#100a20', 
-      font={'color': 'white', 'size': 12},
-  )
-
-  fig.update_xaxes(showgrid=True, gridwidth=2, gridcolor='#1e1733',
-                   rangebreaks=[
-                     dict(bounds=["sat", "mon"])
-                   ]
-  )
-  fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#1e1733')
-  
-  
   return fig
 
 if __name__ == '__main__':
