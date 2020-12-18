@@ -36,6 +36,13 @@ def follow_security(symbol, interval, cancel_events=False):
   latest_price = r.stocks.get_latest_price(symbol)
   logging.info('%s : %s' % (symbol, latest_price))
 
+# Only Bitcoin, Ethereum and Litecoin supported
+def is_crypto(symbol):
+  if symbol=="BTC" or symbol=="ETH" or symbol=="LTC":
+    return True
+
+  return False
+
 def get_historicals(symbol, **kargs):
   interval = 'day'
   if 'interval' in kargs:
@@ -45,9 +52,16 @@ def get_historicals(symbol, **kargs):
   if 'span' in kargs:
     span = kargs['span']
 
-  rh_historicals = r.stocks.get_stock_historicals(symbol, interval=interval, span=span)
+  if not is_crypto(symbol):
+
+    rh_historicals = r.stocks.get_stock_historicals(symbol, interval=interval, span=span)
+
+  else:
+    rh_historicals = r.crypto.get_crypto_historicals(symbol,interval=interval, span=span)
+
   historicals_dict = merge_dict(rh_historicals)
   historicals_frame = pd.DataFrame.from_dict(historicals_dict)
+
   return historicals_frame
 
 def get_macd_intersections(signal : pd.Series, fast : pd.Series): 
